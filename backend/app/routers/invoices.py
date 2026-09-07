@@ -26,6 +26,7 @@ just recorded. See _classify_decision() below — this is a necessary
 follow-on from this change, not a separate feature request.
 """
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -43,7 +44,7 @@ router = APIRouter(prefix="/invoices", tags=["invoices"])
 class InvoiceCreate(BaseModel):
     invoice_number: str
     vendor_name: str
-    po_number: str | None = None
+    po_number: Optional[str] = None
     amount: float
 
 
@@ -74,7 +75,7 @@ def _invoice_to_dict(inv: Invoice) -> dict:
     }
 
 
-def _write_audit(db: Session, user_id: int | None, entity_id: int, action: str, old_value, new_value):
+def _write_audit(db: Session, user_id: Optional[int], entity_id: int, action: str, old_value, new_value):
     db.add(AuditLog(
         user_id=user_id,
         entity_type="invoice",
@@ -85,7 +86,7 @@ def _write_audit(db: Session, user_id: int | None, entity_id: int, action: str, 
     ))
 
 
-def _classify_decision(ai_recommendation: str | None, human_decision: str) -> str:
+def _classify_decision(ai_recommendation: Optional[str], human_decision: str) -> str:
     """
     Distinguishes three cases for the audit log, needed to measure
     override rate now that status doesn't auto-adopt ai_recommendation:
@@ -148,9 +149,16 @@ def create_invoice(
     # regardless of what the AI recommended, or whether the AI call
     # succeeded at all. It only ever changes via PATCH /{id}/decision.
 
+    # Keyed as rule_engine_flags, not flags — ai_result now has its own
+    # "flags" key (claude_client.py's tool schema), and {"flags": flags,
+    # **ai_result} would have let ai_result's value silently overwrite
+    # the rule engine's on key collision. Keeping both distinct on purpose:
+    # rule_engine_flags is what the deterministic checks found; ai_result's
+    # flags (if the finalized schema keeps that field) is whatever the
+    # LLM says it based its call on — worth being able to compare, not merge.
     _write_audit(
         db, user_id=None, entity_id=invoice.id, action="ai_recommendation",
-        old_value=None, new_value={"flags": flags, **ai_result},
+        old_value=None, new_value={"rule_engine_flags": flags, **ai_result},
     )
 
     db.commit()
