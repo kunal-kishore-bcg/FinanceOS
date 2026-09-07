@@ -1,0 +1,12 @@
+[
+  {"po_number": "PO-2024-001", "vendor_name": "Acme Consulting Ltd", "approved_amount": 45000, "cost_centre": "IT-Operations", "status": "Open"},
+  {"po_number": "PO-2024-002", "vendor_name": "Global Print Co", "approved_amount": 3200, "cost_centre": "Marketing", "status": "Open"},
+  {"po_number": "PO-2024-003", "vendor_name": "FastCloud Infra", "approved_amount": 12800, "cost_centre": "IT-Infrastructure", "status": "Open"},
+  {"po_number": "PO-2024-004", "vendor_name": "Meridian Legal", "approved_amount": 28500, "cost_centre": "Legal", "status": "Open"},
+  {"po_number": "PO-2024-005", "vendor_name": "Acme Consulting Ltd", "approved_amount": 18000, "cost_centre": "Finance", "status": "Closed"},
+  {"po_number": "PO-2024-006", "vendor_name": "OfficeHub Supplies", "approved_amount": 1450, "cost_centre": "Admin", "status": "Open"},
+  {"po_number": "PO-2024-007", "vendor_name": "TechForce Recruitment", "approved_amount": 67000, "cost_centre": "HR", "status": "Open"},
+  {"po_number": "PO-2024-008", "vendor_name": "BlueSky Travel", "approved_amount": 9100, "cost_centre": "Travel", "status": "Open"},
+  {"po_number": "PO-2024-009", "vendor_name": "DataBridge Analytics", "approved_amount": 33000, "cost_centre": "Finance", "status": "Open"},
+  {"po_number": "PO-2024-010", "vendor_name": "SecureVault Storage", "approved_amount": 5600, "cost_centre": "IT-Operations", "status": "Open"}
+]

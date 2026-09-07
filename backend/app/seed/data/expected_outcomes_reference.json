@@ -1,0 +1,20 @@
+{
+  "_note": "Appendix A2's 'Exception Flag' and 'Expected AI Output' columns, kept as a QA fixture for validating the triage engine in Phase 2. Deliberately NOT loaded into the invoices table — an invoice record shouldn't ship with the answer key baked in.",
+  "cases": [
+    {"invoice_number": "INV-001", "exception_flag": "None", "expected_output": "Approve"},
+    {"invoice_number": "INV-002", "exception_flag": "Over PO by $650", "expected_output": "Escalate"},
+    {"invoice_number": "INV-003", "exception_flag": "None", "expected_output": "Approve"},
+    {"invoice_number": "INV-004", "exception_flag": "No PO, unrecognised vendor", "expected_output": "Reject"},
+    {"invoice_number": "INV-005", "exception_flag": "None", "expected_output": "Approve"},
+    {"invoice_number": "INV-006", "exception_flag": "Duplicate of INV-001", "expected_output": "Escalate"},
+    {"invoice_number": "INV-007", "exception_flag": "Under PO — partial invoice", "expected_output": "Approve"},
+    {"invoice_number": "INV-008", "exception_flag": "Over PO by $4,000", "expected_output": "Escalate"},
+    {"invoice_number": "INV-009", "exception_flag": "PO number does not exist", "expected_output": "Reject"},
+    {"invoice_number": "INV-010", "exception_flag": "None", "expected_output": "Approve"},
+    {"invoice_number": "INV-011", "exception_flag": "PO is Closed", "expected_output": "Reject"},
+    {"invoice_number": "INV-012", "exception_flag": "None", "expected_output": "Approve"},
+    {"invoice_number": "INV-013", "exception_flag": "PO is Closed", "expected_output": "Reject"},
+    {"invoice_number": "INV-014", "exception_flag": "Missing PO reference field", "expected_output": "Escalate"},
+    {"invoice_number": "INV-015", "exception_flag": "Over PO by $1,200", "expected_output": "Escalate"}
+  ]
+}
