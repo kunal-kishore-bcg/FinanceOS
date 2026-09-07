@@ -42,6 +42,8 @@ both.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 
 def build_known_vendors(purchase_orders: list[dict]) -> set[str]:
     """Vendor universe, derived from the PO register. Process 1 has no
@@ -50,7 +52,7 @@ def build_known_vendors(purchase_orders: list[dict]) -> set[str]:
     return {po["vendor_name"].strip() for po in purchase_orders}
 
 
-def find_matching_po(po_number: str | None, purchase_orders: list[dict]) -> dict | None:
+def find_matching_po(po_number: Optional[str], purchase_orders: list[dict]) -> Optional[dict]:
     """Exact-match lookup by po_number. Returns None for both 'no
     po_number given' and 'po_number given but not in the register' —
     evaluate_invoice() tells those two apart using the raw invoice
@@ -66,10 +68,10 @@ def find_matching_po(po_number: str | None, purchase_orders: list[dict]) -> dict
 
 def evaluate_invoice(
     invoice: dict,
-    matched_po: dict | None,
+    matched_po: Optional[dict],
     *,
-    all_invoices: list[dict] | None = None,
-    known_vendors: set[str] | None = None,
+    all_invoices: Optional[list[dict]] = None,
+    known_vendors: Optional[set[str]] = None,
 ) -> list[str]:
     """
     Run all seven checks in the specified order and return the flags
