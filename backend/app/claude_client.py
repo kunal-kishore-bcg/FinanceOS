@@ -7,9 +7,43 @@ with defined keys) — do not parse free-text responses with regex").
 
 The prompt lives in /prompts/invoice_triage.md, not hardcoded here
 (brief 6.3: "Prompts must be externalised from code"). That file is
-currently a PLACEHOLDER — see the note at its top. Swap in the
-finalized version from your Prompt Engineering chat before the demo;
-nothing else in this file needs to change when you do.
+currently a PLACEHOLDER — see the note at its top.
+
+--------------------------------------------------------------------
+SCHEMA STATUS — read before assuming this matches your finalized prompt
+--------------------------------------------------------------------
+TRIAGE_TOOL below has 5 fields (recommendation, rationale, confidence,
+flags, reviewer_action) per your instruction. Three of them
+(confidence, flags, reviewer_action) are PROVISIONAL — the local copy
+of /prompts/invoice_triage.md has no JSON schema section to check
+against, so their types/enum values are a best guess, not a verified
+match to whatever you've written in your Prompt Engineering chat:
+
+  - confidence: enum "high"/"medium"/"low". Could just as easily be a
+    0-1 float or a 0-100 score in your actual prompt — went with a
+    categorical enum because everything else in this project has been
+    "Finance-literate language, no technical terms," and a raw
+    probability reads as a technical artifact to a Finance analyst.
+  - flags: array of strings — assumed to echo back the rule-engine
+    findings the recommendation was based on (same shape already
+    passed in via the user message).
+  - reviewer_action: free-text string — one sentence telling the human
+    reviewer what to check before acting on the recommendation.
+
+Paste the actual JSON schema from your prompt and these three get
+corrected to match exactly, not guessed at.
+
+CONSEQUENCE NOT YET HANDLED: confidence/flags/reviewer_action are
+returned by get_triage_recommendation() below, but Invoice (the model)
+only has ai_recommendation and ai_rationale columns. Nothing in
+routers/invoices.py stores the new three fields anywhere queryable —
+right now they'd only survive inside the audit_log JSON blob, not on
+the invoice row itself. That's specifically why the frontend's
+Confidence column would still show nothing after this change alone —
+closing that gap needs a follow-up migration + model + router change,
+not just this file. Flagging it now so it doesn't look like this fix
+was supposed to be complete on its own.
+--------------------------------------------------------------------
 """
 from __future__ import annotations
 
@@ -43,8 +77,29 @@ TRIAGE_TOOL = {
                 "type": "string",
                 "description": "One sentence, plain-English, explaining the recommendation to a Finance analyst.",
             },
+            # PROVISIONAL — see module docstring. Confirm against the
+            # real prompt: type (enum vs numeric) and exact values.
+            "confidence": {
+                "type": "string",
+                "enum": ["high", "medium", "low"],
+                "description": "How confident the model is in this recommendation, in Finance-literate terms.",
+            },
+            # PROVISIONAL — see module docstring. Confirm whether this
+            # should echo the rule-engine findings verbatim or be a
+            # model-selected subset of the ones that drove the decision.
+            "flags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The rule-engine findings this recommendation is based on.",
+            },
+            # PROVISIONAL — see module docstring. Confirm field name
+            # and whether it's free text or a constrained set of actions.
+            "reviewer_action": {
+                "type": "string",
+                "description": "One sentence telling the human reviewer what to check before acting on this recommendation.",
+            },
         },
-        "required": ["recommendation", "rationale"],
+        "required": ["recommendation", "rationale", "confidence", "flags", "reviewer_action"],
     },
 }
 
@@ -79,22 +134,33 @@ def get_triage_recommendation(
     """
     Returns {"recommendation": "approve"|"escalate"|"reject"|None,
               "rationale": str | None,
+              "confidence": "high"|"medium"|"low"|None,
+              "flags": list[str] | None,
+              "reviewer_action": str | None,
               "error": str | None}.
 
+    All 6 keys are present on every return path, including every
+    failure branch below — a caller checking result.get("confidence")
+    should never hit a KeyError just because the AI call failed instead
+    of succeeding.
+
     On any failure (timeout, rate limit, malformed response, anything
-    else), recommendation is None and error explains why — brief 3.2:
-    "handle LLM failure gracefully ... show a fallback state in the
-    UI." The caller must not default a None recommendation to
+    else), every field is None except error, which explains why —
+    brief 3.2: "handle LLM failure gracefully ... show a fallback state
+    in the UI." The caller must not default a None recommendation to
     "approve" — that would auto-approve on the *absence* of AI output,
     which is worse than the "never auto-approve on AI output alone"
     rule it's meant to satisfy. routers/invoices.py keeps such invoices
     in pending_review.
     """
+    empty_result = {"recommendation": None, "rationale": None, "confidence": None,
+                     "flags": None, "reviewer_action": None}
+
     try:
         system_prompt = _load_system_prompt()
     except FileNotFoundError as e:
         logger.error(str(e))
-        return {"recommendation": None, "rationale": None, "error": str(e)}
+        return {**empty_result, "error": str(e)}
 
     user_message = _build_user_message(invoice_number, vendor_name, amount, flags)
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -111,20 +177,16 @@ def get_triage_recommendation(
         )
     except anthropic.APITimeoutError:
         logger.warning("Claude API timed out for invoice %s", invoice_number)
-        return {"recommendation": None, "rationale": None,
-                "error": "AI request timed out — manual review required."}
+        return {**empty_result, "error": "AI request timed out — manual review required."}
     except anthropic.RateLimitError:
         logger.warning("Claude API rate-limited for invoice %s", invoice_number)
-        return {"recommendation": None, "rationale": None,
-                "error": "AI service is rate-limited — manual review required."}
+        return {**empty_result, "error": "AI service is rate-limited — manual review required."}
     except anthropic.APIStatusError as e:
         logger.error("Claude API error for invoice %s: %s", invoice_number, e)
-        return {"recommendation": None, "rationale": None,
-                "error": f"AI service error ({e.status_code}) — manual review required."}
+        return {**empty_result, "error": f"AI service error ({e.status_code}) — manual review required."}
     except Exception as e:  # last-resort net — this call must never crash the request
         logger.error("Unexpected error calling Claude for invoice %s: %s", invoice_number, e)
-        return {"recommendation": None, "rationale": None,
-                "error": "AI service unavailable — manual review required."}
+        return {**empty_result, "error": "AI service unavailable — manual review required."}
 
     for block in response.content:
         if block.type == "tool_use" and block.name == "submit_triage_recommendation":
@@ -132,9 +194,11 @@ def get_triage_recommendation(
             return {
                 "recommendation": result.get("recommendation"),
                 "rationale": result.get("rationale"),
+                "confidence": result.get("confidence"),
+                "flags": result.get("flags"),
+                "reviewer_action": result.get("reviewer_action"),
                 "error": None,
             }
 
     logger.error("Claude response for invoice %s had no tool_use block", invoice_number)
-    return {"recommendation": None, "rationale": None,
-            "error": "AI did not return a structured recommendation — manual review required."}
+    return {**empty_result, "error": "AI did not return a structured recommendation — manual review required."}
