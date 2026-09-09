@@ -1,7 +1,7 @@
 /* ==========================================================================
    Design tokens
 
-   This is an internal Finance ops tool, not a marketing surface — the
+   This is an internal Finance ops tool, not a marketing surface â€” the
    brief asked explicitly for "clean table, readable colours, no
    unnecessary complexity," so the palette and type choices below are
    restrained on purpose rather than a hero-image, gradient-accent
@@ -282,7 +282,8 @@ select:focus-visible {
    ========================================================================== */
 
 .invoice-form,
-.decision-form {
+.decision-form,
+.pdf-upload-form {
   display: flex;
   gap: 16px;
   align-items: flex-end;
@@ -383,7 +384,7 @@ select:focus-visible {
 }
 
 /* ==========================================================================
-   Badges — AI recommendation, colour-coded per the brief
+   Badges â€” AI recommendation, colour-coded per the brief
    ========================================================================== */
 
 .badge {
