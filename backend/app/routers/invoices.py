@@ -157,6 +157,7 @@ def _create_invoice_from_fields(
 
     invoice.ai_recommendation = ai_result.get("recommendation")
     invoice.ai_rationale = ai_result.get("rationale") or ai_result.get("error")
+    invoice.confidence = ai_result.get("confidence")
     # status is deliberately NOT touched here — it stays "pending_review"
     # regardless of what the AI recommended, or whether the AI call
     # succeeded at all. It only ever changes via PATCH /{id}/decision.
@@ -265,9 +266,11 @@ def list_invoices(db: Session = Depends(get_db), current_user: User = Depends(ge
             "status": inv.status,
             "ai_recommendation": inv.ai_recommendation,
             "ai_rationale": inv.ai_rationale,
+            "confidence": inv.confidence,
             "human_override": inv.human_override,
             "reviewed_by": inv.reviewed_by,
             "reviewed_at": inv.reviewed_at,
+            "created_at": inv.created_at,
         }
         for inv in invoices
     ]
