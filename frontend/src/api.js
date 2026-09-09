@@ -63,3 +63,24 @@ export function decideInvoice(token, invoiceId, decision, reason) {
     body: { decision, reason },
   });
 }
+
+export async function uploadInvoicePdf(token, file) {
+  // Deliberately not using request() — that helper always sets
+  // Content-Type: application/json. A multipart upload needs the
+  // browser to set Content-Type itself (with the correct boundary
+  // string), so this builds its own fetch call instead of forcing
+  // FormData through a JSON-shaped wrapper.
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/invoices/upload-pdf`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response, "Could not process this PDF"));
+  }
+  return response.json();
+}
