@@ -33,6 +33,15 @@ class Invoice(Base):
        WHAT a human decided, not WHO or WHEN. Section 6.2 is explicit
        that override rate has to be measurable to be improved on —
        that requires a reviewer reference.
+
+    5. confidence added (migration 0002). Claude's tool schema
+       (claude_client.py) has returned a confidence value since the
+       schema was expanded to 5 fields, but until this column existed
+       it was computed and then discarded — never persisted, never
+       returned by GET /invoices/. Nullable string ("high"/"medium"/
+       "low"), same provisional-until-the-real-prompt-confirms-it
+       status as the rest of that schema — see claude_client.py's
+       docstring.
     """
     __tablename__ = "invoices"
 
@@ -44,6 +53,7 @@ class Invoice(Base):
     status = Column(String, nullable=False, default="pending_review")  # pending_review | approved | escalated | rejected
     ai_recommendation = Column(String, nullable=True)  # approve | escalate | reject
     ai_rationale = Column(Text, nullable=True)
+    confidence = Column(String, nullable=True)  # high | medium | low — see docstring point 5
     human_override = Column(String, nullable=True)  # approve | escalate | reject; null if AI decision stands
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
