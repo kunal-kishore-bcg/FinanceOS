@@ -1,7 +1,7 @@
 /* ==========================================================================
    Design tokens
 
-   This is an internal Finance ops tool, not a marketing surface â€” the
+   This is an internal Finance ops tool, not a marketing surface — the
    brief asked explicitly for "clean table, readable colours, no
    unnecessary complexity," so the palette and type choices below are
    restrained on purpose rather than a hero-image, gradient-accent
@@ -384,7 +384,7 @@ select:focus-visible {
 }
 
 /* ==========================================================================
-   Badges â€” AI recommendation, colour-coded per the brief
+   Badges — AI recommendation, colour-coded per the brief
    ========================================================================== */
 
 .badge {
@@ -393,6 +393,7 @@ select:focus-visible {
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
+  cursor: help;
 }
 
 .badge-approve {
