@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import RecommendationBadge from "./RecommendationBadge.jsx";
 
 const DECISION_LABELS = { approve: "Approve", escalate: "Escalate", reject: "Reject" };
+const CONFIDENCE_LABELS = { high: "High", medium: "Medium", low: "Low" };
 
 function deriveStatus(invoice) {
   if (!invoice.reviewed_by) {
@@ -117,12 +118,15 @@ export default function InvoiceTable({ invoices, onDecision }) {
                   <td className="cell-amount">{formatCurrency(invoice.amount)}</td>
                   <td>{invoice.po_number || <span className="cell-muted">None provided</span>}</td>
                   <td>
-                    <RecommendationBadge recommendation={invoice.ai_recommendation} />
+                    <RecommendationBadge recommendation={invoice.ai_recommendation} rationale={invoice.ai_rationale} />
                   </td>
-                  {/* The API doesn't return a confidence score yet — see the
-                      note where this table is introduced. Shown honestly
-                      rather than invented or left blank. */}
-                  <td className="cell-muted">Not provided by AI</td>
+                  {/* invoice.confidence doesn't exist in the API response yet — see
+                      the flag in the response this shipped in. This will start
+                      showing real values automatically the moment the backend
+                      persists and returns it; nothing here needs to change then. */}
+                  <td className={invoice.confidence ? undefined : "cell-muted"}>
+                    {invoice.confidence ? CONFIDENCE_LABELS[invoice.confidence] || invoice.confidence : "Not provided by AI"}
+                  </td>
                   <td>
                     <span className={`status-pill ${statusInfo.className}`}>{statusInfo.label}</span>
                     {statusInfo.decision && (
