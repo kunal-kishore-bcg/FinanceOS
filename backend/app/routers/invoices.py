@@ -28,7 +28,7 @@ follow-on from this change, not a separate feature request.
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,9 @@ from app.database import get_db
 from app.models import Invoice, PurchaseOrder, AuditLog, User
 from app.rule_engine import evaluate_invoice, find_matching_po, build_known_vendors
 from app.claude_client import get_triage_recommendation
+from app.pdf_extraction import extract_invoice_fields, PdfExtractionError
+
+MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB — generous for a single-page invoice, cheap safety net
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -105,25 +108,34 @@ def _classify_decision(ai_recommendation: Optional[str], human_decision: str) ->
     return "human_override"
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_invoice(
-    payload: InvoiceCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if db.query(Invoice).filter(Invoice.invoice_number == payload.invoice_number).first():
-        raise HTTPException(status_code=409, detail=f"Invoice {payload.invoice_number} already exists")
+def _create_invoice_from_fields(
+    db: Session,
+    current_user: User,
+    invoice_number: str,
+    vendor_name: str,
+    po_number: Optional[str],
+    amount: float,
+) -> dict:
+    """
+    The actual invoice-creation pipeline: dedupe check, rule engine,
+    Claude triage, audit log, response shape. Both POST / (manual
+    entry) and POST /upload-pdf call this — it's the only way to
+    guarantee the PDF path is "exactly as the manual entry flow does,"
+    not just similar code that could drift out of sync with it.
+    """
+    if db.query(Invoice).filter(Invoice.invoice_number == invoice_number).first():
+        raise HTTPException(status_code=409, detail=f"Invoice {invoice_number} already exists")
 
     all_pos = [_po_to_dict(po) for po in db.query(PurchaseOrder).all()]
     all_invoices = [_invoice_to_dict(inv) for inv in db.query(Invoice).all()]  # existing invoices only
     known_vendors = build_known_vendors(all_pos)
-    matched_po = find_matching_po(payload.po_number, all_pos)
+    matched_po = find_matching_po(po_number, all_pos)
 
     invoice = Invoice(
-        invoice_number=payload.invoice_number,
-        vendor_name=payload.vendor_name,
-        po_number=payload.po_number,
-        amount=payload.amount,
+        invoice_number=invoice_number,
+        vendor_name=vendor_name,
+        po_number=po_number,
+        amount=amount,
         status="pending_review",
     )
     db.add(invoice)
@@ -172,6 +184,72 @@ def create_invoice(
         "ai_rationale": invoice.ai_rationale,
         "status": invoice.status,
     }
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+def create_invoice(
+    payload: InvoiceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _create_invoice_from_fields(
+        db, current_user,
+        invoice_number=payload.invoice_number,
+        vendor_name=payload.vendor_name,
+        po_number=payload.po_number,
+        amount=payload.amount,
+    )
+
+
+@router.post("/upload-pdf", status_code=status.HTTP_201_CREATED)
+async def upload_invoice_pdf(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Accepts a PDF, extracts invoice_number/vendor_name/amount/po_number
+    via app.pdf_extraction, then runs the exact same
+    _create_invoice_from_fields() pipeline as manual entry — same rule
+    engine, same Claude call, same audit log, same response shape.
+
+    Per the brief: extraction and submission happen in one step, no
+    preview of the extracted fields before they're triaged. See
+    app/pdf_extraction.py's module docstring for what that trade-off
+    actually means — it's a real one, not a formality.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only .pdf files are accepted")
+
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(pdf_bytes) > MAX_PDF_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="PDF exceeds the 10 MB upload limit")
+
+    try:
+        extracted = extract_invoice_fields(pdf_bytes)
+    except PdfExtractionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if extracted["missing_fields"]:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Could not extract required field(s) from the PDF: "
+                f"{', '.join(extracted['missing_fields'])}. Make sure the PDF has "
+                f"clearly labeled Invoice Number, Vendor, and Total/Amount fields, "
+                f"or use manual entry instead."
+            ),
+        )
+
+    return _create_invoice_from_fields(
+        db, current_user,
+        invoice_number=extracted["invoice_number"],
+        vendor_name=extracted["vendor_name"],
+        po_number=extracted["po_number"],
+        amount=extracted["amount"],
+    )
 
 
 @router.get("/")
