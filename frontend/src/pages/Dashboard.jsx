@@ -44,7 +44,7 @@ export default function Dashboard({ token, userEmail, onLogout }) {
   return (
     <div className="dashboard">
       <header className="topbar">
-        <span className="topbar-title">FinanceOS ‚Äî Invoice Exceptions</span>
+        <span className="topbar-title">FinanceOS — Invoice Exceptions</span>
         <div className="topbar-user">
           <span>{userEmail}</span>
           <button className="btn btn-ghost btn-small" onClick={onLogout}>
