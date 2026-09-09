@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchInvoices, createInvoice, decideInvoice } from "../api.js";
+import { fetchInvoices, createInvoice, decideInvoice, uploadInvoicePdf } from "../api.js";
 import SummaryBar from "../components/SummaryBar.jsx";
 import InvoiceForm from "../components/InvoiceForm.jsx";
+import PdfUploadForm from "../components/PdfUploadForm.jsx";
 import InvoiceTable from "../components/InvoiceTable.jsx";
 
 export default function Dashboard({ token, userEmail, onLogout }) {
@@ -30,6 +31,11 @@ export default function Dashboard({ token, userEmail, onLogout }) {
     await loadInvoices();
   }
 
+  async function handleUploadPdf(file) {
+    await uploadInvoicePdf(token, file);
+    await loadInvoices();
+  }
+
   async function handleDecision(invoiceId, decision, reason) {
     await decideInvoice(token, invoiceId, decision, reason);
     await loadInvoices();
@@ -38,7 +44,7 @@ export default function Dashboard({ token, userEmail, onLogout }) {
   return (
     <div className="dashboard">
       <header className="topbar">
-        <span className="topbar-title">FinanceOS — Invoice Exceptions</span>
+        <span className="topbar-title">FinanceOS ‚Äî Invoice Exceptions</span>
         <div className="topbar-user">
           <span>{userEmail}</span>
           <button className="btn btn-ghost btn-small" onClick={onLogout}>
@@ -50,6 +56,7 @@ export default function Dashboard({ token, userEmail, onLogout }) {
       <main className="dashboard-body">
         <SummaryBar invoices={invoices} />
         <InvoiceForm onSubmit={handleCreateInvoice} />
+        <PdfUploadForm onUpload={handleUploadPdf} />
 
         {error && (
           <div className="form-error" role="alert">
@@ -58,7 +65,7 @@ export default function Dashboard({ token, userEmail, onLogout }) {
         )}
 
         {loading ? (
-          <p className="loading-text">Loading invoices…</p>
+          <p className="loading-text">Loading invoices‚Ä¶</p>
         ) : (
           <InvoiceTable invoices={invoices} onDecision={handleDecision} />
         )}
@@ -66,3 +73,4 @@ export default function Dashboard({ token, userEmail, onLogout }) {
     </div>
   );
 }
+
