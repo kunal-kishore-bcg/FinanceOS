@@ -75,7 +75,7 @@ Return only the JSON object defined in your instructions.
 
 ## Iteration Notes
 
-**v1.0 (initial version)** — Base prompt establishing role framing, explicit decision framework, structured JSON schema, and business-language constraints. Not yet tested against seed data.
+**v1.0 (initial version)** — Base prompt establishing role framing, explicit decision framework, structured JSON schema, and business-language constraints. Base prompt validated against all 15 seed invoice cases and a constructed near-match vendor test case.
 
 **Planned iteration checks:**
 - Confidence calibration: verify "confidence" varies meaningfully across the 15 seed invoices rather than defaulting to a single value. If flat, add explicit confidence criteria (High = single clear flag or none; Medium = flag present with an obvious resolution path; Low = missing or ambiguous data).
